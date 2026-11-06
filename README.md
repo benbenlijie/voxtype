@@ -8,6 +8,49 @@ Voice-to-text for Linux. 9-11× realtime on your CPU. Local by default.
 
 Hold a hotkey (default: ScrollLock) while speaking, release to transcribe and output the text at your cursor position. Voxtype runs Cohere Transcribe (#1 on the Open ASR Leaderboard) faster than realtime on a plain Zen 4 CPU. Parakeet, Whisper, and six more engines if you want them. No cloud, no subscription, no telemetry.
 
+## Optional Voice Suite
+
+This repository also includes optional helpers around the Voxtype core. They do not replace Voxtype's recording or transcription flow, and the original hotkey remains available.
+
+| Helper | What it does | Important boundary |
+| --- | --- | --- |
+| Chinese text processing | Converts Traditional Chinese to Simplified Chinese and cleans up spacing. Can also call a punctuation adapter that you choose and install. | This project does not provide, download, or package punctuation models. |
+| Mouse hold-to-talk | Starts recording after holding the left mouse button still for about 0.5 seconds; moving more than 100 pixels while recording cancels it. | Optional and off by default. The current implementation targets Linux X11; paste behavior varies by app and is not guaranteed. |
+
+### Install the optional helpers
+
+From the repository root:
+
+```bash
+bash scripts/install-voice-suite.sh
+```
+
+Install the Chinese post-processing dependency before enabling it:
+
+```bash
+npm ci --ignore-scripts --prefix "$HOME/.local/share/voice-suite/chinese-postprocess"
+```
+
+Then add this to `~/.config/voxtype/config.toml`:
+
+```toml
+[output.post_process]
+command = "voxtype-zh-post"
+timeout_ms = 30000
+trim = true
+fallback_on_empty = true
+```
+
+Punctuation restoration is optional. To use it, install your own model and adapter, then set `VOXTYPE_PUNCTUATION_COMMAND` in Voxtype's process environment. The adapter reads UTF-8 text from standard input and writes the punctuation-restored text to standard output. If it is missing or fails, the other text-processing steps can still run.
+
+The mouse helper needs extra dependencies and explicit opt-in:
+
+```bash
+bash scripts/install-voice-suite.sh --enable-mouse
+```
+
+Read the [Voice Suite guide](docs/voice-suite/README.md), [installation and uninstall instructions](docs/voice-suite/install.md), and [safety and compatibility limits](docs/voice-suite/safety-and-compatibility.md) before enabling optional helpers. The mouse helper is not supported on Wayland by the current implementation, and testing one application does not guarantee compatibility with others.
+
 ## Features
 
 ### Speed and engines
