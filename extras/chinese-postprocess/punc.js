@@ -16,3 +16,25 @@ export function tidy(text) {
     .replace(/\s*\/\s*/gu, '/')
     .replace(/\bC\s*\+\s*\+/gu, 'C++');
 }
+
+/**
+ * Apply injectable language conversion and punctuation restoration steps.
+ * Model failures preserve the successfully converted text.
+ */
+export async function processText(text, { toSimplified, restorePunctuation } = {}) {
+  if (!text.trim()) return text;
+
+  const simplified = toSimplified ? await toSimplified(text) : text;
+  if (!/\p{Script=Han}/u.test(simplified) || !restorePunctuation) {
+    return simplified;
+  }
+
+  try {
+    const restored = await restorePunctuation(simplified);
+    return typeof restored === 'string' && restored.length > 0
+      ? tidy(restored)
+      : simplified;
+  } catch {
+    return simplified;
+  }
+}
