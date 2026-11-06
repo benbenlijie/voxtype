@@ -20,7 +20,7 @@ FORBIDDEN_MASK = 1 | 4 | 8 | 32 | 64 | 128 | 512 | 1024 | 2048 | 4096
 
 
 class Companion:
-    def __init__(self, voxtype, dry_run=False, require_unlock=True, autofill=True):
+    def __init__(self, voxtype, dry_run=False, require_unlock=True, autofill=True, right_alt=False):
         from Xlib import display
         self.display = display.Display()
         self.root = self.display.screen().root
@@ -28,6 +28,18 @@ class Companion:
         self.dry_run = dry_run
         self.require_unlock = require_unlock
         self.gesture = Gesture()
+        self.alt_state = None
+        self.alt_blocked = False
+        self.alt_started = 0
+        self.alt_codes = set()
+        if right_alt:
+            from Xlib import XK
+            self.alt_codes = {self.display.keysym_to_keycode(XK.string_to_keysym(name))
+                              for name in ("Alt_R", "ISO_Level3_Shift")}
+            self.alt_codes.discard(0)
+            if not self.alt_codes:
+                raise RuntimeError("无法找到右侧 Alt，保留原设置后重试")
+            LOG.info("右侧 Alt 已接入安全回填；按键编号=%s", sorted(self.alt_codes))
         self.events = queue.Queue(maxsize=4096)
         self.overflow = threading.Event()
         self.reader_failed = threading.Event()
@@ -79,7 +91,7 @@ class Companion:
             extra = (self.fill("start_args") or []) if action == "start" else []
             subprocess.run([self.voxtype, "record", action] + extra, check=True,
                            timeout=1, stdout=subprocess.DEVNULL)
-            LOG.info("鼠标录音：%s", action)
+            LOG.info("辅助录音：%s", action)
         if action in {"stop", "cancel"}:
             self.owns_recording = False
             self.fill("action", action)
@@ -124,14 +136,78 @@ class Companion:
             LOG.info("取消原因：%s", reason)
         self.command(self.gesture.abort())
 
+    def alt_down(self):
+        keys = self.display.query_keymap()
+        return any(keys[code // 8] & (1 << (code % 8)) for code in self.alt_codes)
+
+    def alt_press(self, now):
+        if self.alt_state or getattr(self, "alt_blocked", False):
+            return
+        if self.gesture.pending or self.gesture.recording:
+            self.alt_blocked = True
+            return
+        self.alt_state = "pending"
+        self.alt_started = now
+        self.fill("press_focused")
+
+    def alt_release(self):
+        self.alt_blocked = False
+        state = self.alt_state
+        self.alt_state = None
+        if state == "recording":
+            self.command("stop")
+        elif state == "pending":
+            self.fill("discard_pending")
+
+    def alt_tick(self, now):
+        if not getattr(self, "alt_state", None):
+            return
+        if not self.alt_down():
+            self.alt_release()
+            return
+        if self.alt_state == "pending":
+            # Let the private worker capture keyboard focus before recording.
+            if not self.fill("prepared") and now - self.alt_started < .5:
+                return
+            if not self.idle() or self.unlocked() is not True:
+                self.alt_release()
+                self.alt_blocked = True
+                return
+            # Queries above can be slow; never start after physical release.
+            if not self.alt_down():
+                self.alt_release()
+                return
+            self.command("start")
+            self.alt_state = "recording"
+            self.alt_started = time.monotonic()
+            self.last_check = self.alt_started
+        elif now - self.alt_started >= 60:
+            self.alt_blocked = True
+            self.alt_state = None
+            self.command("cancel")
+        elif now - self.last_check >= .45:
+            if self.unlocked() is False:
+                self.alt_blocked = True
+                self.alt_state = None
+                self.command("cancel")
+            self.last_check = time.monotonic()
+
     def drain(self):
         while True:
             try:
                 kind, button, x, y, timestamp = self.events.get_nowait()
             except queue.Empty:
                 return
-            if kind == "press":
+            if kind == "alt_press":
+                self.alt_press(timestamp)
+            elif kind == "alt_release":
+                # X11 auto-repeat emits release/press while physically held.
+                if not self.alt_down():
+                    self.alt_release()
+            elif kind == "press":
                 self.fill("invalidate")
+                if getattr(self, "alt_state", None):
+                    continue
                 self.command(self.gesture.press(button, x, y, timestamp))
                 if button == 1 and self.gesture.pending:
                     self.fill("press", x, y)
@@ -151,6 +227,9 @@ class Companion:
 
     def tick(self, now):
         """Global gesture checks; no focus or accessibility queries."""
+        self.alt_tick(now)
+        if getattr(self, "alt_state", None):
+            return
         self.command(self.gesture.watchdog(now))
         if self.gesture.pending or self.gesture.recording:
             pointer = self.root.query_pointer()
@@ -219,6 +298,16 @@ class Companion:
                                 and event.data[0] == 32):
                             self.fill("ack_barrier", int(event.data[1][0]))
                         continue
+                    if (event.type in {X.KeyPress, X.KeyRelease}
+                            and event.detail in getattr(self, "alt_codes", set())):
+                        kind = "alt_press" if event.type == X.KeyPress else "alt_release"
+                        if kind == "alt_press" and not self.alt_state:
+                            self.fill("invalidate")
+                        try:
+                            self.events.put_nowait((kind, 0, 0, 0, time.monotonic()))
+                        except queue.Full:
+                            self.overflow.set()
+                        continue
                     if event.type == X.KeyPress:
                         self.fill("invalidate")
                         try:
@@ -260,7 +349,8 @@ class Companion:
                     self.display.next_event()  # Consume our synchronization markers.
                 self.fill("poll")
                 self.tick(time.monotonic())
-                if not self.gesture.pending and not self.gesture.recording:
+                if (not self.gesture.pending and not self.gesture.recording
+                        and not getattr(self, "alt_state", None)):
                     self.fill("discard_pending")
                 time.sleep(.01)
         finally:
@@ -279,6 +369,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--voxtype", default=str(Path.home() / ".local/bin/voxtype"))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--right-alt", action="store_true", help="右侧 Alt 复用安全回填")
     parser.add_argument("--no-autofill", action="store_true",
                         help="保留半秒长按录音，关闭自动回填")
     parser.add_argument("--isolated-test", action="store_true",
@@ -296,7 +387,7 @@ def main():
     with (runtime / f"voxtype-mouse-hold-{os.getuid()}.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         companion = Companion(args.voxtype, args.dry_run, not args.isolated_test,
-                              not args.no_autofill)
+                              not args.no_autofill, args.right_alt)
         def shutdown(*_):
             companion.running = False
         signal.signal(signal.SIGTERM, shutdown)

@@ -105,7 +105,17 @@ def deliver(text, target, copy, safe, *, clipboard=None):
     return "copied"
 
 
-def capture_target(x, y):
+def capture_target(x, y, focused=False):
+    if focused:
+        target = WindowTarget()
+        try:
+            if target.capture(x, y, focused=True):
+                return target
+        except Exception:
+            pass
+        target.close()
+        return None
+
     # Compatibility paste records the original focused window when AT-SPI
     # cannot reliably identify an editable field.
     compat = WindowTarget()
@@ -163,7 +173,7 @@ def rescue(directory, end):
     return 1
 
 
-def run(directory, x, y, isolated=False):
+def run(directory, x, y, isolated=False, focused=False):
     # The only persistent content is this recording's own transcript in a
     # private runtime directory. Existing field text is never retrieved.
     os.umask(0o077)
@@ -172,7 +182,8 @@ def run(directory, x, y, isolated=False):
     end = time.monotonic() + 210
     try:
         time.sleep(.04)  # Let the original mouse-down set its insertion point.
-        target = capture_target(x, y)
+        target = (capture_target(x, y, focused=True) if focused
+                  else capture_target(x, y))
         if target is None:
             LOG.info("未确认可回填输入框；本次只复制")
             return 0
@@ -266,10 +277,11 @@ def main():
     parser.add_argument("y", type=int)
     parser.add_argument("--isolated-test", action="store_true")
     parser.add_argument("--copy-only", action="store_true")
+    parser.add_argument("--focused", action="store_true")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     code = (rescue(args.directory, time.monotonic() + 90) if args.copy_only
-            else run(args.directory, args.x, args.y, args.isolated_test))
+            else run(args.directory, args.x, args.y, args.isolated_test, args.focused))
     if code == 0:
         (args.directory / "finished").touch()
     raise SystemExit(code)

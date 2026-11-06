@@ -56,7 +56,15 @@ class Autofill:
             self.current.process.terminate()
             self.current = None
 
-    def press(self, x, y):
+    def press_focused(self):
+        self.press(0, 0, focused=True)
+
+    def prepared(self):
+        job = self.current
+        return (not job or job.process.poll() is not None
+                or (job.directory / "ready").exists())
+
+    def press(self, x, y, focused=False):
         self.invalidate()
         self.discard_pending()
         directory = Path(tempfile.mkdtemp(prefix="voxtype-fill-", dir=self.runtime))
@@ -66,6 +74,8 @@ class Autofill:
             (directory / "barrier-token").write_text(str(token))
         args = [sys.executable, str(Path(__file__).with_name("fill_worker.py")),
                 str(directory), str(x), str(y)]
+        if focused:
+            args.append("--focused")
         if not self.require_unlock:
             args.append("--isolated-test")
         try:
@@ -92,7 +102,7 @@ class Autofill:
                 "generic": "普通程序原窗口和焦点（兼容粘贴）",
                 "terminal": "终端原窗口（兼容粘贴）",
             }
-            LOG.info("本次鼠标录音已记住%s；识别后再次核对",
+            LOG.info("本次录音已记住%s；识别后再次核对",
                      destinations.get(mode, "原输入框"))
             return ["--file=" + str(job.directory / "transcript"),
                     "--no-auto-submit", "--no-smart-auto-submit"]

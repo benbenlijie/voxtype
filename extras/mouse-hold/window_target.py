@@ -110,7 +110,7 @@ class WindowTarget:
         self.rejection_reason = reason
         return False
 
-    def capture(self, x, y):
+    def capture(self, x, y, focused=False):
         self.xid = self.property(self.root, "_NET_ACTIVE_WINDOW")
         if not self.xid:
             return False
@@ -137,7 +137,7 @@ class WindowTarget:
         # x,y is only used to check the original press, never to click again.
         point = self.root.translate_coords(self.window, 0, 0)
         bounds = self.window.get_geometry()
-        if not (point.x <= x < point.x + bounds.width
+        if not focused and not (point.x <= x < point.x + bounds.width
                 and point.y <= y < point.y + bounds.height):
             return False
         focus = self.display.get_input_focus().focus
