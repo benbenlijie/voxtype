@@ -1,8 +1,33 @@
 """Keep machine-specific data and runtime artifacts out of the public tree."""
 from pathlib import Path
 
-SKIP_PARTS = {".git", "target", "node_modules", ".pytest_cache", "__pycache__"}
+SKIP_PARTS = {".git", "target", "node_modules"}
 FORBIDDEN_SUFFIXES = {".onnx", ".bin", ".pyc", ".pyo"}
+ALLOWED_WAV_ROOTS = {
+    Path("tests/fixtures/vad"),
+    Path("tests/fixtures/sensevoice"),
+}
+PRIVATE_NAME_PARTS = {
+    "backup",
+    "backups",
+    "credentials",
+    "credential",
+    "keys",
+    "private",
+    "secrets",
+    "logs",
+}
+PRIVATE_NAME_MARKERS = (
+    ".env",
+    "apikey",
+    "api_key",
+    "credential",
+    "id_rsa",
+    "private_key",
+    "secret",
+    "token",
+)
+PRIVATE_SUFFIXES = {".key", ".pem", ".log", ".bak", ".backup", ".orig", ".rej"}
 
 
 def public_paths(root: Path):
@@ -18,19 +43,33 @@ def violations(root: Path):
     found = []
     for path in paths:
         rel = path.relative_to(root)
+        rel_parts = {part.lower() for part in rel.parts}
+        lower_name = path.name.lower()
+        if (
+            rel_parts.intersection(PRIVATE_NAME_PARTS)
+            or any(marker in lower_name for marker in PRIVATE_NAME_MARKERS)
+            or lower_name.endswith("~")
+            or lower_name.endswith(tuple(PRIVATE_SUFFIXES))
+            or ".bak-" in lower_name
+        ):
+            found.append(rel)
         if path.is_file():
             if path.suffix.lower() in FORBIDDEN_SUFFIXES and not path.name.startswith("Dockerfile."):
                 found.append(rel)
-            # Audio fixtures already tracked by Voxtype are legitimate; runtime
-            # audio belongs nowhere in the optional companion modules.
-            if "extras" in rel.parts and path.suffix.lower() == ".wav":
+            # Only the existing core fixtures are public. Runtime audio in any
+            # other directory must not enter the repository.
+            if path.suffix.lower() == ".wav" and not any(
+                rel == allowed or allowed in rel.parents for allowed in ALLOWED_WAV_ROOTS
+            ):
                 found.append(rel)
-            if path.name in {"transcript", "transcript.tmp"}:
+            if lower_name in {"transcript", "transcript.tmp"}:
                 found.append(rel)
             if path.name in {"install-voice-suite.sh", "uninstall-voice-suite.sh"} or path.suffix == ".service":
                 text = path.read_text(errors="replace")
                 if "/home/" in text or "/Users/" in text:
                     found.append(rel)
+        elif path.name in {"__pycache__", ".pytest_cache"}:
+            found.append(rel)
     return sorted(set(found))
 
 
@@ -55,3 +94,30 @@ def test_public_tree_allows_existing_core_audio_fixtures(tmp_path):
     fixtures.mkdir(parents=True)
     (fixtures / "speech.wav").touch()
     assert violations(tmp_path) == []
+
+
+def test_public_tree_reports_caches_private_files_and_unapproved_audio(tmp_path):
+    (tmp_path / "extras/tests/__pycache__").mkdir(parents=True)
+    (tmp_path / "extras/tests/.pytest_cache").mkdir()
+    (tmp_path / "extras/mouse-hold").mkdir(parents=True)
+    (tmp_path / "extras/mouse-hold/runtime.wav").touch()
+    (tmp_path / "tests/fixtures/other.wav").parent.mkdir(parents=True)
+    (tmp_path / "tests/fixtures/other.wav").touch()
+    (tmp_path / ".env").touch()
+    (tmp_path / "private.log").touch()
+    (tmp_path / "id_rsa").touch()
+    (tmp_path / "config.toml.bak-20261106").touch()
+    (tmp_path / "backups").mkdir()
+
+    found = set(violations(tmp_path))
+    assert {
+        Path("extras/tests/__pycache__"),
+        Path("extras/tests/.pytest_cache"),
+        Path("extras/mouse-hold/runtime.wav"),
+        Path("tests/fixtures/other.wav"),
+        Path(".env"),
+        Path("private.log"),
+        Path("id_rsa"),
+        Path("config.toml.bak-20261106"),
+        Path("backups"),
+    } <= found
