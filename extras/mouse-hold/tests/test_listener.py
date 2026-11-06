@@ -1,5 +1,6 @@
 import subprocess
 import unittest
+import threading
 from unittest.mock import patch
 from listener import Companion
 
@@ -11,6 +12,20 @@ class ListenerSafetyTests(unittest.TestCase):
         self.c.dry_run = False
         self.c.owns_recording = False
         self.c.require_unlock = True
+
+    def test_reader_failure_exits_with_failure_for_service_restart(self):
+        c = Companion.__new__(Companion)
+        c.running = True
+        c.reader_failed = threading.Event()
+        c.reader_failed.set()
+        c.owns_recording = False
+        c.autofill = False
+        c.fill = lambda *_: None
+        c.barrier_window = type("Window", (), {"destroy": lambda *_: None})()
+        c.display = type("Display", (), {"close": lambda *_: None})()
+        with patch("listener.threading.Thread"):
+            with self.assertRaisesRegex(RuntimeError, "鼠标监听线程意外退出"):
+                c.run()
 
     def test_cancel_logs_reason_without_field_content(self):
         from gesture import Gesture

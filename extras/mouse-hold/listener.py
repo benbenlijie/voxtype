@@ -271,6 +271,8 @@ class Companion:
                 self.fill("close")
                 self.barrier_window.destroy()
                 self.display.close()
+        if self.reader_failed.is_set() and self.running:
+            raise RuntimeError("鼠标监听线程意外退出")
 
 
 def main():

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import secrets
@@ -63,7 +64,7 @@ class Autofill:
         if self.barrier_window:
             (directory / "barrier-window").write_text(str(self.barrier_window))
             (directory / "barrier-token").write_text(str(token))
-        args = ["/usr/bin/python3", str(Path(__file__).with_name("fill_worker.py")),
+        args = [sys.executable, str(Path(__file__).with_name("fill_worker.py")),
                 str(directory), str(x), str(y)]
         if not self.require_unlock:
             args.append("--isolated-test")
@@ -133,7 +134,7 @@ class Autofill:
                     job.rescued = True
                     try:
                         job.process = subprocess.Popen([
-                            "/usr/bin/python3", str(Path(__file__).with_name("fill_worker.py")),
+                            sys.executable, str(Path(__file__).with_name("fill_worker.py")),
                             str(job.directory), "0", "0", "--copy-only"],
                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
                         job.created = time.monotonic()
