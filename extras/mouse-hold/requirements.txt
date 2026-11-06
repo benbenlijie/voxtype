@@ -1,0 +1,5 @@
+# Runtime dependency for the X11 listener.
+python-xlib>=0.33,<1
+
+# Test-only dependency; not needed to run the listener.
+# pytest>=8,<10
