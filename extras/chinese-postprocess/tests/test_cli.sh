@@ -41,4 +41,18 @@ output=$(printf '  \n\t' | PATH="$tmp/bin:$PATH" "$root/voxtype-zh-post" 2>"$tmp
 [[ ! -s "$tmp/called" ]]
 [[ ! -s "$tmp/stderr" ]]
 
+# Keep the portable bundle free of copied workstation paths and private directories.
+scan_files=(
+  "$root/README.md"
+  "$root/model-source.md"
+  "$root/package.json"
+  "$root/package-lock.json"
+  "$root/punc.js"
+  "$root/voxtype-zh-post"
+)
+if grep -nHE '(/home/[^[:space:]"'"'"']+|/Users/[^[:space:]"'"'"']+|[A-Za-z]:[\\/]Users[\\/]|\.hermes)' "${scan_files[@]}"; then
+  printf 'portable bundle contains a workstation path\n' >&2
+  exit 1
+fi
+
 printf 'CLI contract tests passed\n'

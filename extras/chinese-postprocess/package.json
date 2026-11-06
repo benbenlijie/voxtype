@@ -5,5 +5,9 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.mjs"
+  },
+  "dependencies": {
+    "opencc-js": "1.4.2",
+    "sherpa-onnx-node": "2.0.1"
   }
 }
