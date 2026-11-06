@@ -56,3 +56,17 @@ website/docs
 # Local agent worktrees and ephemeral plans
 .claude/worktrees/
 PLAN-*.md
+
+# Optional voice-suite runtime data and generated test/build artifacts
+**/__pycache__/
+**/.pytest_cache/
+**/node_modules/
+**/*.py[cod]
+**/*.onnx
+**/*.bin
+extras/**/*.wav
+**/transcript
+**/transcript.tmp
+# Keep the repository's existing, intentional Voxtype audio test fixtures public.
+!tests/fixtures/vad/*.wav
+!tests/fixtures/sensevoice/*.wav
