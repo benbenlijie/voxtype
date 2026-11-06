@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import stat
+import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -29,6 +31,12 @@ class ResultTests(unittest.TestCase):
     def test_exact_chinese_result_removes_only_added_newline(self):
         self.result()
         self.assertEqual(read_result(self.path), ("ok", "中文测试"))
+
+    def test_result_file_is_restricted_before_reading(self):
+        self.result()
+        self.path.chmod(0o644)
+        self.assertEqual(read_result(self.path), ("ok", "中文测试"))
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
 
     def test_original_final_newline_preserved(self):
         self.assertEqual(decode_transcript("中文\n", 3), "中文\n")
@@ -225,6 +233,14 @@ class ManagerTests(unittest.TestCase):
         self.patch = patch("autofill.subprocess.Popen", return_value=self.child)
         self.patch.start()
         self.addCleanup(self.patch.stop)
+
+    def test_workers_use_the_python_interpreter_running_the_listener(self):
+        process = Mock()
+        process.poll.return_value = None
+        manager = Autofill(runtime=self.temp.name, require_unlock=False)
+        with patch("autofill.subprocess.Popen", return_value=process) as popen:
+            manager.press(12, 34)
+        self.assertEqual(popen.call_args.args[0][0], sys.executable)
 
     def prepare(self):
         self.manager.press(100, 100)

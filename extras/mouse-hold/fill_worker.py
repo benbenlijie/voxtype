@@ -52,6 +52,9 @@ def read_result(path):
     if not done.exists():
         return None
     try:
+        # Voxtype creates this file. Tighten its permissions before reading or
+        # delivering it; the containing runtime directory is private as well.
+        path.chmod(0o600)
         if done.stat().st_size > 4096:
             return "skip", ""
         result = json.loads(done.read_text())
