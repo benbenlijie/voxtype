@@ -1,0 +1,21 @@
+[Unit]
+Description=Voxtype X11 mouse-hold recording companion
+After=graphical-session.target voxtype.service
+PartOf=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=@PYTHON@ @INSTALL_DIR@/listener.py --voxtype @VOXTYPE@
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=4
+KillMode=control-group
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+UMask=0077
+Environment=PYTHONUNBUFFERED=1
+
+# This template intentionally has no installation section. An installer may
+# append one only when the user explicitly chooses automatic startup.
