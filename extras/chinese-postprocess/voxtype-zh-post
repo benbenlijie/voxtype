@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -u
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+input=$(cat)
+
+if [[ -z "${input//[[:space:]]/}" ]]; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+node_bin=$(command -v node 2>/dev/null || true)
+if [[ -z "$node_bin" ]]; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+result=$(printf '%s' "$input" | "$node_bin" --input-type=module -e '
+import { processText } from process.argv[1];
+const input = await new Promise((resolve, reject) => {
+  let value = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (chunk) => { value += chunk; });
+  process.stdin.on("end", () => resolve(value));
+  process.stdin.on("error", reject);
+});
+const output = await processText(input, {
+  toSimplified: async (text) => text,
+  restorePunctuation: async () => null,
+});
+process.stdout.write(output);
+' "$script_dir/punc.js" 2>/dev/null)
+status=$?
+
+if [[ "$status" -ne 0 || -z "${result//[[:space:]]/}" ]]; then
+  printf '%s' "$input"
+else
+  printf '%s' "$result"
+fi
