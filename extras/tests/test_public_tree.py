@@ -1,4 +1,5 @@
 """Keep machine-specific data and runtime artifacts out of the public tree."""
+import subprocess
 from pathlib import Path
 
 SKIP_PARTS = {".git", "target", "node_modules"}
@@ -31,6 +32,50 @@ PRIVATE_SUFFIXES = {".key", ".pem", ".log", ".bak", ".backup", ".orig", ".rej"}
 
 
 def public_paths(root: Path):
+    root = root.resolve()
+    try:
+        repo_root = Path(
+            subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        ).resolve()
+    except (OSError, subprocess.CalledProcessError):
+        repo_root = None
+
+    if repo_root == root:
+        # Inspect tracked files plus untracked files that Git would consider
+        # candidates for publication. This deliberately leaves ignored pytest
+        # output out of the checkout-wide check, while tracked cache artifacts
+        # remain visible and are still rejected below.
+        output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            check=True,
+            capture_output=True,
+        ).stdout
+        paths = {
+            root / Path(relative)
+            for relative in output.decode().split("\0")
+            if relative
+        }
+        for path in tuple(paths):
+            parent = path.parent
+            while parent != root:
+                paths.add(parent)
+                parent = parent.parent
+        return sorted(paths)
+
     return [
         path
         for path in root.rglob("*")
@@ -75,7 +120,7 @@ def violations(root: Path):
 
 def test_public_tree_has_no_private_or_runtime_artifacts(tmp_path):
     # Check the actual checkout while isolating only traversal logic in tests.
-    assert violations(Path(".")) == []
+    assert violations(Path(__file__).resolve().parents[2]) == []
 
 
 def test_public_tree_reports_forbidden_companion_artifacts(tmp_path):
