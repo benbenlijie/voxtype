@@ -15,7 +15,7 @@ if [[ -f "$manifest" ]]; then
   while IFS= read -r relative || [[ -n "$relative" ]]; do
     case "$relative" in
       *../*|*/..|../*) printf '跳过清单中含有路径回退的条目。\n' >&2 ;;
-      .local/share/voice-suite/*|.local/bin/voice-suite-*|.config/systemd/user/voice-suite-mouse.service)
+      .local/share/voice-suite/*|.local/bin/voice-suite-*|.local/bin/voxtype-zh-post|.config/systemd/user/voice-suite-mouse.service)
         target="$home_dir/$relative"
         if [[ -f "$target" || -L "$target" ]]; then
           rm -f -- "$target"
@@ -26,6 +26,9 @@ if [[ -f "$manifest" ]]; then
     esac
   done < "$manifest"
   rm -f -- "$manifest"
+fi
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload || true
 fi
 
 # Remove only empty directories created for the optional suite.

@@ -17,37 +17,37 @@
 
 “普通应用”只表示当前用户拥有、且能通过 X11 进程信息确认的窗口。兼容粘贴无法识别同一窗口里的具体输入框、密码框或网页状态；使用前请确认焦点确实在目标输入框。
 
-## 安装接口假设
+## 安装
 
-基础安装器需要把本目录安装到一个用户可读目录，并把 `voxtype-mouse-hold.service.in` 中的三个占位符替换为绝对路径：
+在项目根目录运行安装器。它会把本目录安装到用户目录，并把 `voxtype-mouse-hold.service.in` 中的三个占位符替换为绝对路径：
 
 - `@PYTHON@`：可用的 Python 解释器，且已安装 `requirements.txt` 中的 `python-xlib`。
 - `@INSTALL_DIR@`：本目录安装后的绝对路径。
 - `@VOXTYPE@`：实际使用的 Voxtype 可执行文件绝对路径。
 
-生成后的服务文件放入：
+安装器会把模板中的 `@PYTHON@`、`@INSTALL_DIR@` 和 `@VOXTYPE@` 替换为当前机器的实际路径，并生成：
 
 ```text
-~/.config/systemd/user/voxtype-mouse-hold.service
+~/.config/systemd/user/voice-suite-mouse.service
 ```
 
-模板默认没有 `[Install]` 和 `WantedBy`，所以安装后不会自动启用。只有用户在安装器中明确选择自动启动时，安装器才应追加：
+模板默认没有 `[Install]` 和 `WantedBy`，所以安装后不会自动启用。只有用户运行安装器并明确加上 `--enable-mouse` 时，安装器才会追加：
 
 ```ini
 [Install]
 WantedBy=graphical-session.target
 ```
 
-安装器不应改写 Voxtype 的配置、模型目录或公共安装逻辑；这个服务是独立的可选组件。
+安装器不会改写 Voxtype 的配置或模型目录；这个服务是独立的可选组件。
 
 ## 手动控制
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user start voxtype-mouse-hold.service
-systemctl --user stop voxtype-mouse-hold.service
-systemctl --user disable --now voxtype-mouse-hold.service
-journalctl --user -u voxtype-mouse-hold.service -n 20 --no-pager
+systemctl --user start voice-suite-mouse.service
+systemctl --user stop voice-suite-mouse.service
+systemctl --user disable --now voice-suite-mouse.service
+journalctl --user -u voice-suite-mouse.service -n 20 --no-pager
 ```
 
 如果只想保留 Voxtype 的语音剪贴板，不想自动回填，可在服务的 `ExecStart` 末尾加入：

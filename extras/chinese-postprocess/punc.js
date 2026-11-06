@@ -26,15 +26,15 @@ export async function processText(text, { toSimplified, restorePunctuation } = {
 
   const simplified = toSimplified ? await toSimplified(text) : text;
   if (!/\p{Script=Han}/u.test(simplified) || !restorePunctuation) {
-    return simplified;
+    return tidy(simplified);
   }
 
   try {
     const restored = await restorePunctuation(simplified);
     return typeof restored === 'string' && restored.length > 0
       ? tidy(restored)
-      : simplified;
+      : tidy(simplified);
   } catch {
-    return simplified;
+    return tidy(simplified);
   }
 }

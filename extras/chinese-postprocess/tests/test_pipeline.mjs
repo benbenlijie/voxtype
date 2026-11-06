@@ -32,7 +32,7 @@ test('returns empty input without invoking processing functions', async () => {
   assert.equal(called, false);
 });
 
-test('keeps completed simplification when punctuation model is unavailable', async () => {
+test('keeps simplification and punctuation spacing when the model is unavailable', async () => {
   const result = await processText('繁體文字', {
     toSimplified: () => '简体 文字',
     restorePunctuation: () => null,
