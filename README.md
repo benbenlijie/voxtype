@@ -15,7 +15,7 @@ This repository also includes optional helpers around the Voxtype core. They do 
 | Helper | What it does | Important boundary |
 | --- | --- | --- |
 | Chinese text processing | Converts Traditional Chinese to Simplified Chinese and cleans up spacing. Can also call a punctuation adapter that you choose and install. | This project does not provide, download, or package punctuation models. |
-| Mouse hold-to-talk | Starts recording after holding the left mouse button still for about 0.5 seconds; moving more than 100 pixels while recording cancels it. | Optional and off by default. The current implementation targets Linux X11; paste behavior varies by app and is not guaranteed. |
+| Mouse hold-to-talk | Starts recording after holding the left mouse button still for about 0.5 seconds; moving more than 20 pixels while recording cancels it. | Optional and off by default. The current implementation targets Linux X11; paste behavior varies by app and is not guaranteed. |
 
 ### Install the optional helpers
 

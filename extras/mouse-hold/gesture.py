@@ -3,7 +3,7 @@
 
 class Gesture:
     def __init__(self, delay=0.5, radius=6, max_recording=120,
-                 recording_radius=100):
+                 recording_radius=20):
         self.delay = delay
         self.radius = radius
         self.max_recording = max_recording
@@ -25,7 +25,7 @@ class Gesture:
 
     def move(self, x, y):
         # 启动前保留原来的小范围限制；录音后允许自然漂移，
-        # 但距最初按下位置超过 100 像素就取消，不累计移动路程。
+        # 但距最初按下位置超过 20 像素就取消，不累计移动路程。
         radius = self.recording_radius if self.recording else self.radius
         ox, oy = self.origin
         if (x - ox) ** 2 + (y - oy) ** 2 > radius ** 2:

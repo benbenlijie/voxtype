@@ -78,7 +78,7 @@ class GlobalHoldTests(unittest.TestCase):
 
     def test_large_move_from_pointer_poll_cancels_once_without_stop(self):
         self.tick(1.01)
-        self.c.root.query_pointer.return_value.root_x = 201
+        self.c.root.query_pointer.return_value.root_x = 121
         self.tick(1.2)
         self.assertEqual(self.actions(), ['start', 'cancel'])
         self.assertFalse(self.c.gesture.recording)
@@ -97,7 +97,7 @@ class GlobalHoldTests(unittest.TestCase):
 
     def test_release_position_over_radius_cancels_even_without_move_event(self):
         self.tick(1.01)
-        self.c.events.put(('release', 1, 201, 100, 1.2))
+        self.c.events.put(('release', 1, 121, 100, 1.2))
         self.c.drain()
         self.assertEqual(self.actions(), ['start', 'cancel'])
 

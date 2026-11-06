@@ -19,20 +19,20 @@ def test_move_away_then_back_before_start_cancels():
     assert not gesture.due(1)
 
 
-def test_exactly_100_pixels_during_recording_is_allowed():
+def test_exactly_20_pixels_during_recording_is_allowed():
     gesture = Gesture()
     gesture.press(1, 100, 100, 0)
     gesture.started(0.5)
-    assert gesture.move(160, 180) is None
+    assert gesture.move(112, 116) is None
     assert gesture.recording
     assert gesture.release(1) == "stop"
 
 
-def test_more_than_100_pixels_cancels_and_return_does_not_rearm():
+def test_more_than_20_pixels_cancels_and_return_does_not_rearm():
     gesture = Gesture()
     gesture.press(1, 100, 100, 0)
     gesture.started(0.5)
-    assert gesture.move(201, 100) == "cancel"
+    assert gesture.move(121, 100) == "cancel"
     assert gesture.move(100, 100) is None
     assert not gesture.recording
     assert not gesture.due(2)

@@ -249,7 +249,7 @@ class Companion:
 
     def run(self):
         threading.Thread(target=self.read_events, daemon=True).start()
-        LOG.info("已启动：任意位置左键原地长按 0.5 秒；启动前移动取消；录音中距按下位置超过 100 像素取消；松开结束；回填=%s",
+        LOG.info("已启动：任意位置左键原地长按 0.5 秒；启动前移动取消；录音中距按下位置超过 20 像素取消；松开结束；回填=%s",
                  "启用" if self.autofill else "关闭")
         try:
             while self.running and not self.reader_failed.is_set():

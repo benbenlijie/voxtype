@@ -2,7 +2,7 @@
 
 > **给代理开发者：** 必须按任务逐项执行；可使用 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。测试先行，保持鼠标监听为独立可选服务；按明确文件清单提交，严禁使用 `git add .`。
 
-**目标：** 将现有鼠标长按助手整理成可从 Voxtype 项目安装的可选 Linux X11 配套服务，保留 0.5 秒启动、100 像素取消、焦点保护、终端粘贴和不自动发送行为。
+**目标：** 将现有鼠标长按助手整理成可从 Voxtype 项目安装的可选 Linux X11 配套服务，保留 0.5 秒启动、20 像素取消、焦点保护、终端粘贴和不自动发送行为。
 
 **架构：** `listener.py` 只监听 X11 输入并编排动作；`gesture.py` 处理纯手势状态；窗口、剪贴板、回填和提示各模块维持分工。服务从用户目录定位 Voxtype 程序和本项目代码，不能写死本机路径。无法确认安全时只保留识别结果或剪贴板，不强制切换焦点。
 
@@ -30,17 +30,17 @@
 
 - [ ] **步骤 1：迁移并检查已有测试**
 
-从 `outputs/voxtype-mouse-hold/gesture.py` 和 `tests/test_gesture.py` 迁移逻辑与覆盖；设置默认 `delay=0.5`、启动前 `radius=6`、最大录音时间 `120` 秒、录音取消距离 `recording_radius=100` 像素。
+从 `outputs/voxtype-mouse-hold/gesture.py` 和 `tests/test_gesture.py` 迁移逻辑与覆盖；设置默认 `delay=0.5`、启动前 `radius=6`、最大录音时间 `120` 秒、录音取消距离 `recording_radius=20` 像素。
 
 - [ ] **步骤 2：运行手势测试**
 
 运行：`python3 -m pytest extras/mouse-hold/tests/test_gesture.py -q`
 
-预期：触发边界、短按、等待时移动、录音中 100 像素取消、松开停止、最大时长取消全部 PASS。
+预期：触发边界、短按、等待时移动、录音中 20 像素取消、松开停止、最大时长取消全部 PASS。
 
 - [ ] **步骤 3：增加边界测试**
 
-明确测试恰好 100 像素不取消、超过 100 像素取消、移动后移回不恢复，以及无效按钮不会启动。
+明确测试恰好 20 像素不取消、超过 20 像素取消、移动后移回不恢复，以及无效按钮不会启动。
 
 - [ ] **步骤 4：再次运行**
 
