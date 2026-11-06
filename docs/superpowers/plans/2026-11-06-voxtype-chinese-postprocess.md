@@ -2,20 +2,20 @@
 
 > **给代理开发者：** 必须按任务逐项执行；可使用 `superpowers:subagent-driven-development` 或 `superpowers:executing-plans`。每次修改先写测试，测试失败后再实现；提交只包含本计划列出的文件。
 
-**目标：** 将本机验证过的简体转换、中文标点恢复和空格修整变成可移植、可选安装、依赖及模型来源清楚的 Voxtype 后处理配套。
+**目标：** 将简体转换、可选中文标点恢复和空格修整变成可移植的 Voxtype 后处理配套；标点模型由用户选择和安装。
 
-**架构：** 使用 Voxtype 已有的 `[output.post_process]` 命令接口，不改 Rust 识别路径。处理器从标准输入读取转写文本，依次做繁转简、中文标点恢复及保守空格修整；任何处理失败都输出原文。模型权重在安装时单独获取，不纳入 Git。
+**架构：** 使用 Voxtype 已有的 `[output.post_process]` 命令接口，不改 Rust 识别路径。处理器从标准输入读取转写文本，依次做繁转简、可选用户适配程序的标点恢复及保守空格修整；处理失败时保留可用文本。项目不提供、不下载或打包标点模型。
 
-**技术栈：** Node.js、`sherpa-onnx-node`、CT-Transformer ONNX 标点模型、Voxtype 配置中的 `output.post_process`。
+**技术栈：** Node.js、`opencc-js`、用户自行安装的标点适配程序、Voxtype 配置中的 `output.post_process`。
 
 ---
 
 ## 文件职责
 
 - `extras/chinese-postprocess/voxtype-zh-post`：稳定命令入口，负责读取标准输入、调用处理步骤和失败回退。
-- `extras/chinese-postprocess/punc.js`：本地中文标点恢复及标点后的空格整理。
+- `extras/chinese-postprocess/punc.js`：调用用户配置的中文标点适配程序及标点后的空格整理。
 - `extras/chinese-postprocess/package.json`、锁文件：固定 JavaScript 运行依赖。
-- `extras/chinese-postprocess/README.md`：运行时依赖、模型来源、模型许可待核实项及无模型降级行为。
+- `extras/chinese-postprocess/README.md`：运行时依赖、用户适配程序接口及无模型降级行为。
 - `extras/chinese-postprocess/tests/`：不访问网络、不需要真实模型的单元测试；标点推理层以替身测试。
 - `extras/chinese-postprocess/models/`：仅放下载说明或 `.gitkeep`，不跟踪权重。
 - `config/default.toml`：通过项目基础计划提供的可移植命令接入示例。
@@ -122,7 +122,7 @@ git add extras/chinese-postprocess/voxtype-zh-post extras/chinese-postprocess/pu
 git commit -m "feat: add portable Chinese postprocess command"
 ```
 
-## 任务 4：核对繁转简、标点模型依赖和许可
+## 任务 4：核对繁转简依赖并说明用户自选模型边界
 
 **文件：**
 - 修改：`extras/chinese-postprocess/package.json`
@@ -134,19 +134,19 @@ git commit -m "feat: add portable Chinese postprocess command"
 
 检查当前用户目录下的 `~/.local/bin/voxtype-zh-post`、`~/.hermes/bin/voxtype-t2s` 和 `~/.local/lib/voxtype-punc/punc.js`；只抽取功能与依赖事实，不把任何个人路径或二进制文件复制进仓库。
 
-- [ ] **步骤 2：加入依赖源和许可核对项**
+- [ ] **步骤 2：加入依赖来源与许可说明**
 
-文档列出繁转简工具、`sherpa-onnx-node` 与模型的正式来源、版本和各自许可。若任一来源/许可无法从随包许可或正式发布页核实，保持该步骤为发布阻断项，不声称可自由再分发。
+文档列出繁转简工具的正式来源、版本和许可，并说明标点模型由用户自行选择和安装；本项目不对用户所选模型的来源或许可作保证。
 
 - [ ] **步骤 3：确定依赖管理方式**
 
-锁文件固定 JS 依赖版本；模型下载脚本只从已核实的正式来源下载，支持 `--model-dir` 和自定义地址，不把远程脚本管道直接交给 shell。用户可只装繁转简/空格修整，不下载标点模型。
+锁文件固定 JS 依赖版本；不新增模型下载脚本。提供 `VOXTYPE_PUNCTUATION_COMMAND` 环境变量，调用用户配置的适配程序。适配程序通过标准输入和标准输出交换文本，禁止经 shell 执行；未配置、启动失败、超时、失败退出或空输出时，使用已完成转换的文字继续回退。
 
 - [ ] **步骤 4：运行无网回归**
 
 运行：`cd extras/chinese-postprocess && npm ci --ignore-scripts && npm test`
 
-预期：依赖按锁文件安装，单测不请求标点模型；真实模型验收单独标注为需要用户下载模型。
+预期：依赖按锁文件安装，单测不请求或下载模型；真实模型验收由用户在本机完成。
 
 - [ ] **步骤 5：提交**
 

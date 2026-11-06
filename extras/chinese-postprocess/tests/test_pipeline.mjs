@@ -55,3 +55,38 @@ test('tidies only the restored model output', async () => {
   });
   assert.equal(result, 'GPT-4o，简体');
 });
+
+test('uses the user-installed punctuation command when configured', async () => {
+  const { runPunctuationCommand } = await import('../punc.js');
+  const result = await runPunctuationCommand(process.execPath, '你好世界', {
+    env: { ...process.env, PUNCT_TEST: '1' },
+    scriptArgs: ['-e', "let s=''; for await (const c of process.stdin) s+=c; process.stdout.write(s.replace('世界','，世界！'))"],
+  });
+  assert.equal(result, '你好，世界！');
+});
+
+test('rejects unsuccessful or empty punctuation command results for fallback', async () => {
+  const { runPunctuationCommand } = await import('../punc.js');
+  await assert.rejects(runPunctuationCommand(process.execPath, '原文', {
+    scriptArgs: ['-e', 'process.exit(7)'],
+  }));
+  await assert.rejects(runPunctuationCommand(process.execPath, '原文', {
+    scriptArgs: ['-e', ''],
+  }));
+});
+
+test('stops a punctuation command that exceeds its time limit', async () => {
+  const { runPunctuationCommand } = await import('../punc.js');
+  await assert.rejects(runPunctuationCommand(process.execPath, '原文', {
+    timeoutMs: 20,
+    scriptArgs: ['-e', 'setTimeout(() => process.stdout.write("迟到"), 1000)'],
+  }), /timed out/);
+});
+
+test('stops a punctuation command that exceeds the output limit', async () => {
+  const { runPunctuationCommand } = await import('../punc.js');
+  await assert.rejects(runPunctuationCommand(process.execPath, '原文', {
+    maxOutputBytes: 4,
+    scriptArgs: ['-e', 'process.stdout.write("输出过长")'],
+  }), /exceeded the limit/);
+});

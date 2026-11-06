@@ -18,7 +18,22 @@ bash scripts/install-voice-suite.sh
 npm ci --ignore-scripts --prefix "$HOME/.local/share/voice-suite/chinese-postprocess"
 ```
 
-这一步需要网络连接。完成后才启用 `output.post_process` 配置。当前没有已核实来源与许可的标点模型，运行时只做繁体转简体及保守空格修整。
+这一步需要网络连接。完成后才启用 `output.post_process` 配置。默认只做繁体转简体及保守空格修整。
+
+如果希望启用中文标点恢复，请先自行选择并安装模型和适配程序，然后在启动 Voxtype 的进程环境中设置：
+
+```sh
+export VOXTYPE_PUNCTUATION_COMMAND="/用户配置的/标点适配程序"
+```
+
+适配程序从标准输入读取文字，将补好标点的结果写到标准输出。模型、模型运行环境和适配程序均由用户自行提供；本项目不提供、不下载或打包模型。若 Voxtype 由用户级 `systemd` 服务启动，运行 `systemctl --user edit voxtype.service`，在打开的文件中加入以下内容，再运行 `systemctl --user daemon-reload` 并重启服务。请按本机实际服务名称操作。
+
+```ini
+[Service]
+Environment="VOXTYPE_PUNCTUATION_COMMAND=/用户配置的/标点适配程序"
+```
+
+适配程序由本配套直接启动，不经 shell；其最长运行时间为 15 秒，输出上限为 1 MiB。超时、启动失败、失败退出或无输出时，会自动跳过标点恢复，继续使用已完成简体转换的文字。
 
 鼠标服务需要 `python3`、`python-xlib`、`xclip`、`gdbus` 和 Linux X11 会话。请先为安装器所用的 `python3` 安装 `extras/mouse-hold/requirements.txt` 中的依赖，并确认 Voxtype 已安装且可从 `PATH` 找到，或位于 `~/.local/bin/voxtype`。安装器生成的服务默认不启用。
 

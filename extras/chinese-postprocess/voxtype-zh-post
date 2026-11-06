@@ -21,7 +21,7 @@ fi
 result=$(printf '%s' "$input" | "$node_bin" --input-type=module -e '
 import { pathToFileURL } from "node:url";
 const scriptUrl = pathToFileURL(process.argv[1]);
-const { processText } = await import(scriptUrl);
+const { processText, runPunctuationCommand } = await import(scriptUrl);
 const input = await new Promise((resolve, reject) => {
   let value = "";
   process.stdin.setEncoding("utf8");
@@ -35,7 +35,9 @@ const output = await processText(input, {
     const { default: OpenCC } = await import(moduleUrl);
     return OpenCC.Converter({ from: "tw", to: "cn" })(text);
   },
-  restorePunctuation: async () => null,
+  restorePunctuation: process.env.VOXTYPE_PUNCTUATION_COMMAND
+    ? (text) => runPunctuationCommand(process.env.VOXTYPE_PUNCTUATION_COMMAND, text)
+    : undefined,
 });
 process.stdout.write(output);
 ' "$script_dir/punc.js" 2>/dev/null)

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
+real_node=$(command -v node)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir "$tmp/bin"
@@ -39,6 +40,20 @@ chmod +x "$tmp/bin/node"
 output=$(printf '  \n\t' | PATH="$tmp/bin:$PATH" "$root/voxtype-zh-post" 2>"$tmp/stderr")
 [[ "$output" == $'  \n\t' ]]
 [[ ! -s "$tmp/called" ]]
+[[ ! -s "$tmp/stderr" ]]
+
+# Verify the configured user adapter is reached through the installed command.
+mkdir "$tmp/real-bin"
+ln -s "$real_node" "$tmp/real-bin/node"
+cat > "$tmp/punctuation-adapter" <<'ADAPTER'
+#!/usr/bin/env bash
+cat >/dev/null
+printf '%s' '你好 ， 世界 ！'
+ADAPTER
+chmod +x "$tmp/punctuation-adapter"
+output=$(printf '繁體文字' | VOXTYPE_PUNCTUATION_COMMAND="$tmp/punctuation-adapter" \
+  PATH="$tmp/real-bin:$PATH" "$root/voxtype-zh-post" 2>"$tmp/stderr")
+[[ "$output" == '你好，世界！' ]]
 [[ ! -s "$tmp/stderr" ]]
 
 # Keep the portable bundle free of copied workstation paths and private directories.
