@@ -1,0 +1,20 @@
+[Unit]
+Description=Voxtype voice typing daemon
+Wants=pipewire.service pipewire-pulse.service wireplumber.service
+After=graphical-session.target sound.target pipewire.service pipewire-pulse.service wireplumber.service
+
+[Service]
+Type=simple
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# 需要固定麦克风时取消注释，并换成自己机器上的设备名：
+#   pactl list sources short
+# 设备名因机器而异，所以模板里默认不写，交给 PipeWire 的默认输入。
+#Environment=PULSE_SOURCE=alsa_input.usb-Generic_AB13X_USB_Audio_20210726905926-00.analog-stereo
+
+ExecStart=%h/.local/bin/voxtype daemon
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

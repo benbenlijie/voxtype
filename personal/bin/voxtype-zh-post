@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Voxtype 中文后处理：繁体 -> 简体，再做本地 CT-Transformer 标点恢复。
+#
+# 输入输出都走 stdin/stdout，任何一步失败都退回上一步的结果，保证不丢字。
+#
+# 可用环境变量覆盖自动探测：
+#   VOXTYPE_T2S_CMD     繁转简命令（默认找同目录的 voxtype-t2s）
+#   VOXTYPE_NODE_BIN    node 可执行文件
+#   VOXTYPE_PUNC_JS     标点恢复脚本（默认 ~/.local/lib/voxtype-punc/punc.js）
+set -u
+
+input="$(cat)"
+if [ -z "${input//[[:space:]]/}" ]; then
+  exit 0
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
+# --- 繁转简 ---
+t2s_cmd="${VOXTYPE_T2S_CMD:-}"
+if [ -z "$t2s_cmd" ]; then
+  for candidate in \
+    "$script_dir/voxtype-t2s" \
+    "$HOME/.local/bin/voxtype-t2s" \
+    "$HOME/.hermes/bin/voxtype-t2s"; do
+    if [ -x "$candidate" ]; then
+      t2s_cmd="$candidate"
+      break
+    fi
+  done
+fi
+
+text="$input"
+if [ -n "$t2s_cmd" ]; then
+  converted="$(printf '%s' "$input" | "$t2s_cmd" 2>/dev/null || true)"
+  if [ -n "${converted//[[:space:]]/}" ]; then
+    text="$converted"
+  fi
+fi
+
+# --- 标点恢复 ---
+node_bin="${VOXTYPE_NODE_BIN:-}"
+if [ -z "$node_bin" ]; then
+  node_bin="$(command -v node 2>/dev/null || true)"
+fi
+if [ -z "$node_bin" ] || [ ! -x "$node_bin" ]; then
+  # nvm 按目录顺序取一个可用的（glob 已按版本升序，取最后一个覆盖）
+  for candidate in "$HOME"/.nvm/versions/node/*/bin/node; do
+    if [ -x "$candidate" ]; then
+      node_bin="$candidate"
+    fi
+  done
+fi
+
+punc_js="${VOXTYPE_PUNC_JS:-}"
+if [ -z "$punc_js" ]; then
+  for candidate in \
+    "$HOME/.local/lib/voxtype-punc/punc.js" \
+    "$script_dir/../lib/punc.js"; do
+    if [ -f "$candidate" ]; then
+      punc_js="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$node_bin" ] || [ -z "$punc_js" ]; then
+  printf '%s' "$text"
+  exit 0
+fi
+
+out="$(printf '%s' "$text" | "$node_bin" "$punc_js" 2>/dev/null || true)"
+if [ -n "${out//[[:space:]]/}" ]; then
+  printf '%s' "$out"
+else
+  printf '%s' "$text"
+fi

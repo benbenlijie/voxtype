@@ -1,0 +1,47 @@
+# Voxtype 个人配置模板
+#
+# 本文件由 personal/install.sh 渲染后写入 ~/.config/voxtype/config.toml。
+# 模板中的 @HOME@ 会替换成安装时的 $HOME，因此请勿手工编辑渲染结果后又重跑安装。
+#
+# 只列出与上游默认值不同的项；其余选项沿用 config/default.toml。
+
+# 供 `voxtype record toggle` / `voxtype status` 使用的状态文件
+state_file = "auto"
+
+[hotkey]
+# 由 mouse-hold 监听器或外部命令触发，daemon 内建的 evdev 热键关闭
+key = "RIGHTALT"
+modifiers = []
+mode = "push_to_talk"
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+
+[whisper]
+# 中文听写：多语言大模型 + 固定中文，避免短句误判语种
+model = "large-v3-turbo"
+language = "zh"
+translate = false
+flash_attention = true
+
+[output]
+# 只写剪贴板，粘贴交给 mouse-hold 的 autofill 或手动
+mode = "clipboard"
+fallback_to_clipboard = true
+type_delay_ms = 0
+paste_keys = "shift+insert"
+
+[output.post_process]
+# 繁转简 + 本地 CT-Transformer 标点恢复
+command = "@HOME@/.local/bin/voxtype-zh-post"
+timeout_ms = 3000
+trim = true
+fallback_on_empty = true
+
+[output.notification]
+on_recording_start = false
+on_recording_stop = false
+on_transcription = true

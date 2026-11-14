@@ -1,0 +1,10 @@
+{
+  "name": "voxtype-personal-punc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Voxtype 中文听写的本地标点恢复（sherpa-onnx CT-Transformer）",
+  "license": "MIT",
+  "dependencies": {
+    "sherpa-onnx-node": "1.13.8"
+  }
+}

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Voxtype 后处理：用本地 ollama 把中文口语稿整理成书面表达。
+#
+# 可选组件，默认不挂到 config.toml 的 post_process 上；需要时把
+# [output.post_process] command 指向本脚本，或写成单独的 profile。
+#
+# 环境变量：
+#   VOXTYPE_OLLAMA_MODEL     指定模型；不设则按候选列表挑第一个已安装的
+#   VOXTYPE_OLLAMA_KEEPALIVE 模型驻留时间（默认 30m）
+#   VOXTYPE_OLLAMA_TIMEOUT   ollama 调用超时秒数（默认 30）
+set -u
+
+input="$(cat)"
+if [ -z "${input//[[:space:]]/}" ]; then
+  exit 0
+fi
+
+if ! command -v ollama >/dev/null 2>&1; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+model="${VOXTYPE_OLLAMA_MODEL:-}"
+if [ -z "$model" ]; then
+  for candidate in qwen2.5:7b-instruct qwen2.5:7b qwen3:8b qwen3:4b deepseek-r1:8b deepseek-r1; do
+    if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "$candidate"; then
+      model="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$model" ]; then
+  printf '%s' "$input"
+  exit 0
+fi
+
+timeout_secs="${VOXTYPE_OLLAMA_TIMEOUT:-30}"
+keepalive="${VOXTYPE_OLLAMA_KEEPALIVE:-30m}"
+
+prompt="你是中文技术写作助手。请把下面的语音转写文本整理成自然、简洁、专业的中文技术表达。要求：只输出整理后的文本；不要回答问题；不要扩写事实；保留代码、命令、路径、变量名、英文技术名词和数字；修正明显错别字、口语填充词、标点和断句。\n\n文本：\n$input"
+
+output="$(timeout "${timeout_secs}s" ollama run "$model" "$prompt" --keepalive "$keepalive" 2>/dev/null || true)"
+# 去掉思考型模型的 <think> 段；python3 缺失时保留原输出
+if command -v python3 >/dev/null 2>&1; then
+  output="$(printf '%s' "$output" | python3 -c 'import re,sys; s=sys.stdin.read(); s=re.sub(r"<think>.*?</think>\s*", "", s, flags=re.S); print(s.strip(), end="")' 2>/dev/null || printf '%s' "$output")"
+fi
+
+if [ -n "${output//[[:space:]]/}" ]; then
+  printf '%s' "$output"
+else
+  printf '%s' "$input"
+fi

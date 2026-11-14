@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""繁体中文 -> 简体中文转换，供 Voxtype 中文后处理调用。
+
+从标准输入读取 UTF-8 文本，写出 OpenCC t2s 转换结果。任何一步不可用
+（缺少 libopencc、缺少配置文件、空输入）时原样输出，保证不阻塞听写。
+
+环境变量：
+  VOXTYPE_OPENCC_CONFIG  指定 t2s.json 路径，覆盖自动探测
+  VOXTYPE_OPENCC_LIB     指定 libopencc 共享库名或路径
+"""
+
+from __future__ import annotations
+
+import ctypes
+import ctypes.util
+import os
+import sys
+
+DEFAULT_CONFIGS = (
+    "/usr/share/opencc/t2s.json",
+    "/usr/local/share/opencc/t2s.json",
+    "/usr/share/opencc/TSCharacters.json",
+)
+DEFAULT_LIBS = ("libopencc.so.1.1", "libopencc.so.1", "libopencc.so")
+
+OPENCC_ERROR = ctypes.c_void_p(-1).value
+
+
+def _find_config() -> bytes | None:
+    override = os.environ.get("VOXTYPE_OPENCC_CONFIG")
+    candidates = (override,) if override else DEFAULT_CONFIGS
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path.encode()
+    return None
+
+
+def _load_library():
+    names = list(DEFAULT_LIBS)
+    override = os.environ.get("VOXTYPE_OPENCC_LIB")
+    if override:
+        names.insert(0, override)
+    found = ctypes.util.find_library("opencc")
+    if found:
+        names.append(found)
+    for name in names:
+        try:
+            return ctypes.CDLL(name)
+        except OSError:
+            continue
+    return None
+
+
+def convert_to_simplified(text: str) -> str:
+    if not text.strip():
+        return text
+
+    config = _find_config()
+    opencc = _load_library()
+    if config is None or opencc is None:
+        return text
+
+    try:
+        opencc.opencc_open.argtypes = [ctypes.c_char_p]
+        opencc.opencc_open.restype = ctypes.c_void_p
+        opencc.opencc_convert_utf8.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_size_t]
+        opencc.opencc_convert_utf8.restype = ctypes.c_void_p
+        opencc.opencc_convert_utf8_free.argtypes = [ctypes.c_void_p]
+        opencc.opencc_close.argtypes = [ctypes.c_void_p]
+
+        converter = opencc.opencc_open(config)
+        if not converter or converter == OPENCC_ERROR:
+            return text
+
+        encoded = text.encode("utf-8")
+        output_ptr = opencc.opencc_convert_utf8(converter, encoded, len(encoded))
+        try:
+            if not output_ptr or output_ptr == OPENCC_ERROR:
+                return text
+            return ctypes.string_at(output_ptr).decode("utf-8")
+        finally:
+            if output_ptr and output_ptr != OPENCC_ERROR:
+                opencc.opencc_convert_utf8_free(output_ptr)
+            opencc.opencc_close(converter)
+    except Exception:
+        return text
+
+
+def main() -> int:
+    sys.stdout.write(convert_to_simplified(sys.stdin.read()))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
