@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 普通窗口用 Ctrl+V；终端模拟器用 Ctrl+Shift+V；xterm 系用 Shift+Insert。
+# 依赖 xdotool 和 xprop。VOXTYPE_PASTE_KEYS 可全局覆盖，
+# VOXTYPE_PASTE_CLASS 可用于调试窗口类型。
+
+class_override="${VOXTYPE_PASTE_CLASS:-}"
+keys_override="${VOXTYPE_PASTE_KEYS:-}"
+dry_run=0
+
+if [[ "${1:-}" == "--dry-run" ]]; then
+  dry_run=1
+  shift
+fi
+
+if [[ "${1:-}" == "--class" ]]; then
+  class_override="${2:-}"
+  shift 2
+fi
+
+window_id=""
+if [[ -z "$class_override" ]]; then
+  for _ in 1 2 3 4 5; do
+    window_id="$(xdotool getactivewindow 2>/dev/null || xdotool getwindowfocus 2>/dev/null || true)"
+    [[ -n "$window_id" ]] && break
+    sleep 0.05
+  done
+  if [[ -z "$window_id" ]]; then
+    printf 'voxtype-paste-x11: no active X11 window\n' >&2
+    exit 1
+  fi
+
+  class_override="$(xprop -id "$window_id" WM_CLASS 2>/dev/null \
+    | sed -n 's/.*WM_CLASS(STRING) = .*"\([^"]*\)".*/\1/p' \
+    | tail -n 1 \
+    | tr '[:upper:]' '[:lower:]')"
+fi
+
+class_lc="${class_override,,}"
+
+if [[ -n "$keys_override" ]]; then
+  keys="$keys_override"
+else
+  case "$class_lc" in
+    *xterm*|*urxvt*|*rxvt*|st)
+      keys="shift+insert"
+      ;;
+    *terminal*|*konsole*|*alacritty*|*kitty*|*wezterm*|*foot*|*tilix*|*terminator*|*guake*|*yakuake*|*sakura*|*terminology*|*xfce4-terminal*|*lxterminal*)
+      keys="ctrl+shift+v"
+      ;;
+    *)
+      keys="ctrl+v"
+      ;;
+  esac
+fi
+
+if [[ "$dry_run" -eq 1 ]]; then
+  printf 'class=%s\nkeys=%s\n' "${class_lc:-unknown}" "$keys"
+  exit 0
+fi
+
+if [[ "${VOXTYPE_PASTE_DEBUG:-0}" == "1" ]]; then
+  printf 'voxtype-paste-x11: class=%s keys=%s\n' "${class_lc:-unknown}" "$keys" >&2
+fi
+
+xdotool key --clearmodifiers "$keys"

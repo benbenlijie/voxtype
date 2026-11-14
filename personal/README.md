@@ -23,7 +23,7 @@ cd voxtype
 systemctl --user restart voxtype.service
 ```
 
-首次安装会下载 whisper 模型（约 1.6G）和标点模型（约 65MB），其余都是小文件。
+首次安装会检查 whisper 模型；缺少时下载约 1.6G，标点模型约 65MB。
 
 ## 系统依赖
 
@@ -35,6 +35,7 @@ systemctl --user restart voxtype.service
 | `python3` | 繁转简适配器 | 跳过繁转简 |
 | `npm` | 安装 `sherpa-onnx-node` | 标点恢复不可用 |
 | `curl` / `tar` | 下载标点模型 | 需手动放置模型 |
+| `xdotool` / `xprop` | X11 窗口识别与自动粘贴 | 只能手动粘贴剪贴板内容 |
 
 Ubuntu/Debian 上补 OpenCC：
 
@@ -50,6 +51,7 @@ sudo apt install libopencc1.1 opencc
 | `~/.local/bin/voxtype-zh-post` | 繁转简 + 标点恢复，接在 `[output.post_process]` 上 |
 | `~/.local/bin/voxtype-t2s` | OpenCC 繁转简（ctypes 调 libopencc） |
 | `~/.local/bin/voxtype-polish-zh` | 可选的 ollama 润色，默认不挂在配置里 |
+| `~/.local/bin/voxtype-paste-x11` | 按当前窗口发送一次粘贴快捷键 |
 | `~/.local/lib/voxtype-punc/` | `punc.js` + `sherpa-onnx-node` |
 | `~/.local/share/voxtype/punct/` | 标点模型 `model.int8.onnx` |
 | `~/.local/share/voxtype/models/` | whisper 模型（由 `voxtype setup` 下载） |
@@ -62,12 +64,43 @@ sudo apt install libopencc1.1 opencc
 | `whisper.model` | `large-v3-turbo` | 中文准确率 |
 | `whisper.language` | `zh` | 短句不会被误判成英文 |
 | `whisper.flash_attention` | `true` | GPU 显存和速度 |
-| `output.mode` | `clipboard` | 粘贴交给鼠标配套或手动 |
+| `whisper.initial_prompt` | 中文听写约束 | 减少幻觉和补写 |
+| `audio.device` | `pulse` | 适配 PipeWire/PulseAudio 兼容层 |
+| `output.mode` | `clipboard` | 先写剪贴板，再由 helper 粘贴 |
 | `output.paste_keys` | `shift+insert` | 终端里也能粘贴 |
 | `output.post_process.command` | `voxtype-zh-post` | 中文标点 |
-| `hotkey.enabled` | `false` | 由鼠标配套或外部命令触发 |
+| `output.post_output_command` | `voxtype-paste-x11` | 按窗口自动粘贴 |
+| `hotkey.enabled` | `true` | 保留 `RIGHTALT` 按住说话 |
+| `text.spoken_punctuation` | `true` | 支持口述标点 |
+| `vad.enabled` | `true` | 过滤静音和短噪声 |
 
 其余选项沿用仓库的 `config/default.toml`。
+
+## 粘贴策略
+
+`voxtype-paste-x11` 根据当前 X11 窗口的 `WM_CLASS` 选择粘贴键：
+
+- 普通窗口：`Ctrl+V`
+- GNOME Terminal、Konsole、Alacritty、Kitty、WezTerm、Foot 等：`Ctrl+Shift+V`
+- xterm、urxvt、rxvt、st：`Shift+Insert`
+
+调试：
+
+```bash
+voxtype-paste-x11 --dry-run --class google-chrome
+VOXTYPE_PASTE_DEBUG=1 voxtype-paste-x11
+```
+
+`VOXTYPE_PASTE_KEYS` 可全局覆盖。IDE 内置终端仍按顶层窗口识别，必要时用这个变量覆盖。
+
+如果启用 `--with-mouse`，mouse-hold autofill 已经负责回填，应删除
+`post_output_command` 或不要启用 mouse 服务，避免粘贴两次。
+
+## 版本说明
+
+当前模板以 `voxtype 1.1.x` 为目标。`install.sh` 检测到 `0.7.x` 时会警告，
+但会继续安装；模型检查优先查看本地 `ggml-*.bin`，避免旧版本缺少
+`voxtype info models` 时重复下载 1.6G 模型。
 
 ## 选项
 
@@ -110,7 +143,7 @@ cd voxtype && git pull && ./personal/install.sh
 
 ```bash
 systemctl --user disable --now voxtype.service
-rm -f ~/.local/bin/voxtype-{zh-post,t2s,polish-zh}
+rm -f ~/.local/bin/voxtype-{zh-post,t2s,polish-zh,paste-x11}
 rm -rf ~/.local/lib/voxtype-punc
 rm -f ~/.config/systemd/user/voxtype.service
 rm -f ~/.config/voxtype/config.toml   # 想保留就先备份

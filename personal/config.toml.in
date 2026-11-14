@@ -9,14 +9,16 @@
 state_file = "auto"
 
 [hotkey]
-# 由 mouse-hold 监听器或外部命令触发，daemon 内建的 evdev 热键关闭
+# 默认保留内建 RIGHTALT；如果改用 mouse-hold autofill，改为 false，
+# 并避免同时启用 post_output_command，防止重复粘贴。
 key = "RIGHTALT"
 modifiers = []
 mode = "push_to_talk"
-enabled = false
+enabled = true
 
 [audio]
-device = "default"
+# pulse 适配 PipeWire/PulseAudio 兼容层；没有兼容层的机器改成 default。
+device = "pulse"
 sample_rate = 16000
 max_duration_secs = 60
 
@@ -26,13 +28,16 @@ model = "large-v3-turbo"
 language = "zh"
 translate = false
 flash_attention = true
+initial_prompt = "简体中文普通话听写。只输出实际听到的内容，不补写广告或固定话术。"
 
 [output]
-# 只写剪贴板，粘贴交给 mouse-hold 的 autofill 或手动
+# 写入剪贴板后，由 helper 根据当前窗口发送一次粘贴快捷键。
 mode = "clipboard"
 fallback_to_clipboard = true
 type_delay_ms = 0
+# 仅 mouse-hold autofill / 原生 paste 模式使用；普通自动粘贴由 helper 负责。
 paste_keys = "shift+insert"
+post_output_command = "@HOME@/.local/bin/voxtype-paste-x11"
 
 [output.post_process]
 # 繁转简 + 本地 CT-Transformer 标点恢复
@@ -45,3 +50,13 @@ fallback_on_empty = true
 on_recording_start = false
 on_recording_stop = false
 on_transcription = true
+
+[text]
+spoken_punctuation = true
+replacements = { "句号" = "。", "逗号" = "，", "问号" = "？", "感叹号" = "！", "冒号" = "：", "分号" = "；", "顿号" = "、", "省略号" = "……", "左括号" = "（", "右括号" = "）" }
+
+[vad]
+enabled = true
+threshold = 0.35
+backend = "energy"
+min_speech_duration_ms = 120

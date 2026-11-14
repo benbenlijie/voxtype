@@ -3,7 +3,7 @@
 #
 # 前置条件：voxtype 本体已经装好（AUR voxtype-bin、官方 release 二进制，
 # 或者按 docs 自行编译）。本脚本只负责个人层：配置、后处理脚本、标点模型、
-# systemd 用户服务。
+# X11 自动粘贴助手、systemd 用户服务。
 set -euo pipefail
 
 usage() {
@@ -74,6 +74,11 @@ fi
 if [[ -z "$voxtype_bin" ]]; then
   warn "找不到 voxtype 可执行文件。请先安装 voxtype 本体，本脚本不会替你编译。"
   missing=1
+else
+  voxtype_version="$("$voxtype_bin" --version 2>/dev/null | awk '{print $2}' || true)"
+  if [[ -n "$voxtype_version" && ! "$voxtype_version" =~ ^1\. ]]; then
+    warn "检测到 voxtype $voxtype_version；personal 配置以 1.1.x 为目标，部分选项可能被忽略。"
+  fi
 fi
 if ! command -v node >/dev/null 2>&1; then
   warn "找不到 node。标点恢复会被跳过，繁转简仍然可用（装好 node 后重跑本脚本即可）。"
@@ -83,6 +88,9 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 if ! command -v curl >/dev/null 2>&1; then
   warn "找不到 curl。标点模型需要手动下载。"
+fi
+if ! command -v xdotool >/dev/null 2>&1 || ! command -v xprop >/dev/null 2>&1; then
+  warn "找不到 xdotool/xprop。X11 自动粘贴助手不可用，仍可手动粘贴剪贴板内容。"
 fi
 if ((missing)); then
   exit 1
@@ -106,7 +114,7 @@ fi
 
 say "安装后处理脚本到 $bin_dir"
 run mkdir -p "$bin_dir"
-for name in voxtype-zh-post voxtype-t2s voxtype-polish-zh; do
+for name in voxtype-zh-post voxtype-t2s voxtype-polish-zh voxtype-paste-x11; do
   run install -m 0755 "$script_dir/bin/$name" "$bin_dir/$name"
 done
 
@@ -175,7 +183,14 @@ if "$skip_models"; then
 else
   say "检查 whisper 模型（$whisper_model）"
   if [[ -n "$voxtype_bin" ]]; then
-    if "$voxtype_bin" info models 2>/dev/null | grep -qE "^[[:space:]]*installed[[:space:]]+${whisper_model}[[:space:]]*$"; then
+    if [[ "$whisper_model" == /* ]]; then
+      whisper_model_file="$whisper_model"
+    else
+      whisper_model_file="$data_dir/models/ggml-${whisper_model}.bin"
+    fi
+    if [[ -f "$whisper_model_file" ]]; then
+      say "whisper 模型已安装（$whisper_model_file）"
+    elif "$voxtype_bin" info models 2>/dev/null | grep -qE "^[[:space:]]*installed[[:space:]]+${whisper_model}[[:space:]]*$"; then
       say "whisper 模型已安装"
     else
       say "下载 whisper 模型（约 1.6G）"
@@ -232,6 +247,12 @@ else
   printf '   输出：%s\n' "${result:-（空）}"
   if [[ -z "$result" ]]; then
     warn "后处理没有输出，检查 node 和标点模型。"
+  fi
+
+  if [[ -x "$bin_dir/voxtype-paste-x11" ]]; then
+    paste_keys="$("$bin_dir/voxtype-paste-x11" --dry-run --class google-chrome | sed -n 's/^keys=//p' || true)"
+    printf '   普通窗口粘贴键：%s\n' "$paste_keys"
+    [[ "$paste_keys" == "ctrl+v" ]] || warn "普通窗口粘贴键映射异常。"
   fi
 fi
 

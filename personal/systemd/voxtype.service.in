@@ -1,11 +1,14 @@
 [Unit]
 Description=Voxtype voice typing daemon
+Documentation=https://voxtype.io
+PartOf=graphical-session.target
 Wants=pipewire.service pipewire-pulse.service wireplumber.service
 After=graphical-session.target sound.target pipewire.service pipewire-pulse.service wireplumber.service
 
 [Service]
 Type=simple
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=XDG_RUNTIME_DIR=%t
 
 # 需要固定麦克风时取消注释，并换成自己机器上的设备名：
 #   pactl list sources short
